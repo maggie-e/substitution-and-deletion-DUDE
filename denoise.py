@@ -3,13 +3,13 @@ import random
 kmers = []
 
 def allklength(k, alphabet):
-    allklength_helper(k, alphabet, "")
+    allklengthHelper(k, alphabet, "")
     sequence_map = {}
     for i in range(len(kmers)):
         sequence_map[kmers[i]] = i;
     return sequence_map
 
-def allklength_helper(k, alphabet, prefix):
+def allklengthHelper(k, alphabet, prefix):
     if k == 0:
         global kmers
         kmers.append(prefix)
@@ -18,7 +18,7 @@ def allklength_helper(k, alphabet, prefix):
         new_prefix = prefix + alphabet[i]
         allklength_helper(k-1, alphabet, new_prefix)
 
-def calculate_distribution(input_sequence, k, alphabet):
+def calculateMmatrix(input_sequence, k, alphabet):
     matrix_dim = len(alphabet)^k;
     transition_matrix = [[0*matrix_dim]*matrix_dim]
     sequence_map = allklength(k, alphabet)
@@ -31,19 +31,63 @@ def calculate_distribution(input_sequence, k, alphabet):
         for j in range(matrix_dim):
             transition_matrix[i, j] = float[transition_matrix[i, j]]/norm_factor
     return transition_matrix, sequence_map
+
+def calculateDistribution(input_sequence, k, alphabet):
+    context_hist = {}
+    for i in range(k, len(input_sequence)-k):
+        context = input_sequence[i-k:i]+input_sequence[i+1:i+k+1]
+        if context in context_hist:
+            context_hist[context] += input_sequence[i]
+        else:
+            context_hist[context] = [input_sequence[i]]
+    return context_hist
         
-def deletionChannel(input_sequence, deletion_rate):
+def erasureChannel(input_sequence, deletion_rate):
+    noisy = input_sequence
     for i in range(len(input_sequence)):
         x = random.random()
         if x < deletion_rate:
-            input_sequence[i] = 'X'
-    noisy = input_sequence.replace('X', "")
+            noisy = noisy[:i]+'E'+noisy[i+1:]
     return noisy
 
+def deletionChannel(input_sequence, deletion_rate):
+    indices = []
+    for i in range(len(input_sequence)):
+        x = random.random()
+        if x < deletion_rate:
+            indices += i
+    noisy = "".join([char for index, char in enumerate(input_sequence) if index not in indices])
+    return noisy
+
+def erasureDenoise(input_sequence, k, alphabet, deletion_rate):
+    noisy = erasureChannel(input_sequence, deletion_rate)
+    contexts = calculateDistribution(noisy, k, alphabet)
+    ml = alphabet[0]
+    pct = 0
+    for l in alphabet:
+        if sum(noisy == l)/len(noisy) > pct:
+            pct = sum(noisy == l)/len(noisy)
+            ml = l
+    for j in range(k):
+        if noisy[j] == 'E':
+            noisy = noisy[:j]+ml+noisy[j+1:]
+    for m in range(len(noisy)-k, len(noisy)):
+        if noisy[m] == 'E':
+            noisy = noisy[:m]+ml+noisy[m+1:]
+    for i in range(k, len(noisy)-k):
+        if noisy[i] == 'E':
+            p = 0
+            for a in alphabet:
+                context = contexts[noisy[i-k:i]+noisy[i+1:i+k+1]]
+                if sum(context == a)/len(context) > p:
+                    p = sum(context == a)/len(context)
+                    ml = a
+        noisy = noisy[:i]+a+noisy[i+1:]
+    return noisy
 
 def denoiseSequence(input_sequence, k, alphabet, deletion_rate):
     noisy = deletionChannel(input_sequence, deletion_rate)
-    pi, seq_map = calculate_distribution(noisy, k, alphabet)
+    pi, seq_map = calculateMatrix(noisy, k, alphabet)
     denoised = noisy[:k]
     for i in range(k-1, len(noisy)-1-k):
         base_prob = 1-deletion_rate
@@ -63,8 +107,4 @@ def denoiseSequence(input_sequence, k, alphabet, deletion_rate):
         denoised += next_char
     return input_sequence, noisy, denoised
 
-input = '0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101'
-k = 1
-alphabet = ['0', '1']
-deletion_rate = 0.2
-input, noisy, denoised = denoiseSequence(input, k, alphabet, deletion_rate)
+
