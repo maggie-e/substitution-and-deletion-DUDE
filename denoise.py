@@ -4,10 +4,6 @@ kmers = []
 
 def allklength(k, alphabet):
     allklengthHelper(k, alphabet, "")
-    sequence_map = {}
-    for i in range(len(kmers)):
-        sequence_map[kmers[i]] = i;
-    return sequence_map
 
 def allklengthHelper(k, alphabet, prefix):
     if k == 0:
@@ -16,12 +12,15 @@ def allklengthHelper(k, alphabet, prefix):
         return
     for i in range(len(alphabet)):
         new_prefix = prefix + alphabet[i]
-        allklength_helper(k-1, alphabet, new_prefix)
+        allklengthHelper(k-1, alphabet, new_prefix)
 
 def calculateMmatrix(input_sequence, k, alphabet):
     matrix_dim = len(alphabet)^k;
     transition_matrix = [[0*matrix_dim]*matrix_dim]
-    sequence_map = allklength(k, alphabet)
+    allklength(k, alphabet)
+    sequence_map = {}
+    for i in range(len(kmers)):
+        sequence_map[kmers[i]] = i
     for i in range(len(input_sequence)-k-2):
         current = input_sequence[i:i+k]
         next = input_sequence[i+1:i+k+1]
@@ -33,13 +32,14 @@ def calculateMmatrix(input_sequence, k, alphabet):
     return transition_matrix, sequence_map
 
 def calculateDistribution(input_sequence, k, alphabet):
+    allklength(2*k, alphabet)
     context_hist = {}
+    for kmer in kmers:
+        context_hist[kmer] = []
     for i in range(k, len(input_sequence)-k):
         context = input_sequence[i-k:i]+input_sequence[i+1:i+k+1]
-        if context in context_hist:
+        if 'E' not in context:
             context_hist[context] += input_sequence[i]
-        else:
-            context_hist[context] = [input_sequence[i]]
     return context_hist
         
 def erasureChannel(input_sequence, deletion_rate):
@@ -65,7 +65,7 @@ def erasureDenoise(input_sequence, k, alphabet, deletion_rate):
     ml = alphabet[0]
     pct = 0
     for l in alphabet:
-        if sum(noisy == l)/len(noisy) > pct:
+        if sum([int(x == l) for x in noisy])/len(noisy) > pct:
             pct = sum(noisy == l)/len(noisy)
             ml = l
     for j in range(k):
@@ -78,11 +78,12 @@ def erasureDenoise(input_sequence, k, alphabet, deletion_rate):
         if noisy[i] == 'E':
             p = 0
             for a in alphabet:
-                context = contexts[noisy[i-k:i]+noisy[i+1:i+k+1]]
-                if sum(context == a)/len(context) > p:
-                    p = sum(context == a)/len(context)
+                context = noisy[i-k:i]+noisy[i+1:i+k+1]
+                if context in contexts and len(context) > 0 and sum([int(x == a) for x in context])/len(context) > p:
+                    context_hist = contexts[context]
+                    p = sum([int(x == a) for x in context_hist])/len(context_hist)
                     ml = a
-        noisy = noisy[:i]+a+noisy[i+1:]
+            noisy = noisy[:i]+ml+noisy[i+1:]
     return noisy
 
 def denoiseSequence(input_sequence, k, alphabet, deletion_rate):
@@ -107,4 +108,10 @@ def denoiseSequence(input_sequence, k, alphabet, deletion_rate):
         denoised += next_char
     return input_sequence, noisy, denoised
 
-
+n = 10000
+rho = 0.01
+k = 4
+alphabet = ['a', 'c', 't', 'g']
+input = open('humangenome.fasta').read()[:n]
+denoised = erasureDenoise(input, k, alphabet, rho) 
+print(1-sum([int(input[i] == denoised[i]) for i in range(len(input))])/(len(input)+0.0))
