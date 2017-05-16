@@ -1,4 +1,5 @@
 import random
+import numpy as np
 
 kmers = []
 
@@ -14,9 +15,9 @@ def allklengthHelper(k, alphabet, prefix):
         new_prefix = prefix + alphabet[i]
         allklengthHelper(k-1, alphabet, new_prefix)
 
-def calculateMmatrix(input_sequence, k, alphabet):
-    matrix_dim = len(alphabet)^k;
-    transition_matrix = [[0*matrix_dim]*matrix_dim]
+def calculateMatrix(input_sequence, k, alphabet):
+    matrix_dim = len(alphabet)**k;
+    transition_matrix = np.zeros((matrix_dim, matrix_dim))
     allklength(k, alphabet)
     sequence_map = {}
     for i in range(len(kmers)):
@@ -28,7 +29,7 @@ def calculateMmatrix(input_sequence, k, alphabet):
     for i in range(matrix_dim):
         norm_factor = sum(transition_matrix[i, 0:matrix_dim-1])
         for j in range(matrix_dim):
-            transition_matrix[i, j] = float[transition_matrix[i, j]]/norm_factor
+            transition_matrix[i, j] = transition_matrix[i, j]/(norm_factor+0.0)
     return transition_matrix, sequence_map
 
 def calculateDistribution(input_sequence, k, alphabet):
@@ -55,7 +56,7 @@ def deletionChannel(input_sequence, deletion_rate):
     for i in range(len(input_sequence)):
         x = random.random()
         if x < deletion_rate:
-            indices += i
+            indices += [i]
     noisy = "".join([char for index, char in enumerate(input_sequence) if index not in indices])
     return noisy
 
@@ -94,24 +95,27 @@ def denoiseSequence(input_sequence, k, alphabet, deletion_rate):
         base_prob = 1-deletion_rate
         next_char = noisy[i+1]
         subseq = noisy[i+1-k:i+k+1]
-        for j in range(k+1):
+        for j in range(k):
             base_prob *= pi[seq_map[subseq[j:j+k]], seq_map[subseq[j+1:j+k+1]]]
         max_prob = base_prob
         for a in alphabet:
             insert_prob = deletion_rate
             new_subseq = subseq[:k+1]+a+subseq[k+1:]
-            for m in range(k+2):
+            for m in range(k+1):
                 insert_prob *= pi[seq_map[new_subseq[m:m+k]], seq_map[new_subseq[m+1:m+k+1]]]
             if insert_prob > max_prob:
                 max_prob = insert_prob
                 next_char = a + noisy_char[i+1]
         denoised += next_char
+    for i in range(len(noisy)-1-k, len(noisy)):
+        denoised += noisy[i]
     return input_sequence, noisy, denoised
 
-n = 10000
+n = 100000
 rho = 0.01
 k = 4
 alphabet = ['a', 'c', 't', 'g']
 input = open('humangenome.fasta').read()[:n]
-denoised = erasureDenoise(input, k, alphabet, rho) 
-print(1-sum([int(input[i] == denoised[i]) for i in range(len(input))])/(len(input)+0.0))
+erasure_denoised = erasureDenoise(input, k, alphabet, rho) 
+print(1-sum([int(input[i] == erasure_denoised[i]) for i in range(len(input))])/(len(input)+0.0))
+#input, noisy, denoised = denoiseSequence(input, k, alphabet, rho)
