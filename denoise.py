@@ -33,14 +33,13 @@ def calculateMatrix(input_sequence, k, alphabet):
     return transition_matrix, sequence_map
 
 def calculateDistribution(input_sequence, k, alphabet):
-    allklength(2*k, alphabet)
     context_hist = {}
-    for kmer in kmers:
-        context_hist[kmer] = []
     for i in range(k, len(input_sequence)-k):
         context = input_sequence[i-k:i]+input_sequence[i+1:i+k+1]
-        if 'E' not in context:
+        if context in context_hist:
             context_hist[context] += input_sequence[i]
+        else:
+            context_hist[context] = [input_sequence[i]]
     return context_hist
         
 def erasureChannel(input_sequence, deletion_rate):
@@ -69,22 +68,31 @@ def erasureDenoise(input_sequence, k, alphabet, deletion_rate):
         if sum([int(x == l) for x in noisy])/len(noisy) > pct:
             pct = sum(noisy == l)/len(noisy)
             ml = l
+    most_common = ml
     for j in range(k):
         if noisy[j] == 'E':
             noisy = noisy[:j]+ml+noisy[j+1:]
     for m in range(len(noisy)-k, len(noisy)):
         if noisy[m] == 'E':
             noisy = noisy[:m]+ml+noisy[m+1:]
+    erasure_corrections = []
     for i in range(k, len(noisy)-k):
         if noisy[i] == 'E':
             p = 0
+            ml = most_common
+            context = noisy[i-k:i]+noisy[i+1:i+k+1]
+            context_hist = contexts[context]
             for a in alphabet:
-                context = noisy[i-k:i]+noisy[i+1:i+k+1]
-                if context in contexts and len(context) > 0 and sum([int(x == a) for x in context])/len(context) > p:
-                    context_hist = contexts[context]
-                    p = sum([int(x == a) for x in context_hist])/len(context_hist)
+                new_p = sum([int(x == a) for x in context_hist])/len(context_hist)
+                if new_p > p:
+                    p = new_p
                     ml = a
-            noisy = noisy[:i]+ml+noisy[i+1:]
+            erasure_corrections += ml
+    j = 0
+    for i in range(k, len(noisy)-k):
+        if noisy[i] == 'E':
+            noisy = noisy[:i]+erasure_corrections[j]+noisy[i+1:]
+            j += 1
     return noisy
 
 def denoiseSequence(input_sequence, k, alphabet, deletion_rate):
