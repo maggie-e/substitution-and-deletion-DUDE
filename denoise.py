@@ -22,6 +22,7 @@ def calculateMatrix(input_sequence, k, alphabet):
     sequence_map = {}
     for i in range(len(kmers)):
         sequence_map[kmers[i]] = i
+    print(sequence_map)
     for i in range(len(input_sequence)-k-2):
         current = input_sequence[i:i+k]
         next = input_sequence[i+1:i+k+1]
@@ -113,17 +114,19 @@ def denoiseSequence(input_sequence, k, alphabet, deletion_rate):
                 insert_prob *= pi[seq_map[new_subseq[m:m+k]], seq_map[new_subseq[m+1:m+k+1]]]
             if insert_prob > max_prob:
                 max_prob = insert_prob
-                next_char = a + noisy_char[i+1]
+                next_char = a + noisy[i+1]
         denoised += next_char
     for i in range(len(noisy)-1-k, len(noisy)):
         denoised += noisy[i]
     return input_sequence, noisy, denoised
 
+
 n = 100000
 rho = 0.01
-k = 4
+k = 2
 alphabet = ['a', 'c', 't', 'g']
 input = open('humangenome.fasta').read()[:n]
 erasure_denoised = erasureDenoise(input, k, alphabet, rho) 
 print(1-sum([int(input[i] == erasure_denoised[i]) for i in range(len(input))])/(len(input)+0.0))
 #input, noisy, denoised = denoiseSequence(input, k, alphabet, rho)
+
