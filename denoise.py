@@ -2,6 +2,8 @@ import random
 import numpy as np
 
 kmers = []
+read_length = 50
+num_reads = 10000
 
 def allklength(k, alphabet):
     allklengthHelper(k, alphabet, "")
@@ -14,6 +16,13 @@ def allklengthHelper(k, alphabet, prefix):
     for i in range(len(alphabet)):
         new_prefix = prefix + alphabet[i]
         allklengthHelper(k-1, alphabet, new_prefix)
+
+def takeReads(genome):
+    concatenated = ''
+    for i in range(num_reads):
+        index = int(random.random()*(len(genome)-read_length))
+        concatenated += genome[index:index+read_length]
+    return concatenated
 
 def calculateMatrix(input_sequence, k, alphabet):
     matrix_dim = len(alphabet)**k;
@@ -96,7 +105,7 @@ def erasureDenoise(input_sequence, k, alphabet, deletion_rate):
             j += 1
     return noisy
 
-def denoiseSequence(input_sequence, k, alphabet, deletion_rate):
+def denoiseSequence1(input_sequence, k, alphabet, deletion_rate):
     noisy = deletionChannel(input_sequence, deletion_rate)
     pi, seq_map = calculateMatrix(noisy, k, alphabet)
     denoised = noisy[:k]
@@ -120,13 +129,44 @@ def denoiseSequence(input_sequence, k, alphabet, deletion_rate):
         denoised += noisy[i]
     return input_sequence, noisy, denoised
 
+def denoiseSequence2(input_sequence, k, alphabet, deletion_rate):
+    noisy = deletionChannel(input_sequence, deletion_rate)
+    context_hist = {}
+    context_del_hist = {}
+    for i in range(k, len(noisy)-k+1):
+        if i < len(noisy)-k:
+            context = noisy[i-k:i]+noisy[i+1:i+k+1]
+            if context in context_hist:
+                context_hist[context] += noisy[i]
+            else:
+                context_hist[context] = [noisy[i]]
+        context_del = noisy[i-k:i+k]
+        if context_del in context_del_hist:
+            context_del_hist[context_del] = context_del_hist[context_del] + 1
+        else:
+            context_del_hist[context_del] = 1
+    for i in range(k, len(noisy)-k):
+        context = noisy[i-k:i+k]
+        if context in context_hist and context in context_del_hist:
+            if deletion_rate*len(context_hist[context]) >= (1-deletion_rate)*context_del_hist[context]:
+                ml = alphabet[0]
+                p = 0
+                for a in alphabet:
+                    new_p = sum(context_hist[context] == a)/(len(context_hist[context])+0.0)
+                    if new_p > p:
+                        p = new_p
+                        ml = a
+                noisy = noisy[:i]+ml+noisy[i:]
+    return input_sequence, noisy
+    
 
-n = 100000
+n = 10000
 rho = 0.01
 k = 2
 alphabet = ['a', 'c', 't', 'g']
 input = open('humangenome.fasta').read()[:n]
+input = takeReads(input)
 erasure_denoised = erasureDenoise(input, k, alphabet, rho) 
 print(1-sum([int(input[i] == erasure_denoised[i]) for i in range(len(input))])/(len(input)+0.0))
-#input, noisy, denoised = denoiseSequence(input, k, alphabet, rho)
+#input, denoised = denoiseSequence2(input, k, alphabet, rho)
 
