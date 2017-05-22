@@ -79,13 +79,10 @@ def erasureDenoise(input_sequence, k, alphabet, deletion_rate):
             pct = sum(noisy == l)/len(noisy)
             ml = l
     most_common = ml
+    erasure_corrections = []
     for j in range(k):
         if noisy[j] == 'E':
-            noisy = noisy[:j]+ml+noisy[j+1:]
-    for m in range(len(noisy)-k, len(noisy)):
-        if noisy[m] == 'E':
-            noisy = noisy[:m]+ml+noisy[m+1:]
-    erasure_corrections = []
+            erasure_corrections += most_common
     for i in range(k, len(noisy)-k):
         if noisy[i] == 'E':
             p = 0
@@ -98,8 +95,11 @@ def erasureDenoise(input_sequence, k, alphabet, deletion_rate):
                     p = new_p
                     ml = a
             erasure_corrections += ml
+    for m in range(len(noisy)-k, len(noisy)):
+        if noisy[m] == 'E':
+            erasure_corrections += most_common
     j = 0
-    for i in range(k, len(noisy)-k):
+    for i in range(len(noisy)):
         if noisy[i] == 'E':
             noisy = noisy[:i]+erasure_corrections[j]+noisy[i+1:]
             j += 1
