@@ -162,14 +162,40 @@ def denoiseSequence2(input_sequence, k, alphabet, deletion_rate):
                 noisy = noisy[:i]+ml+noisy[i:]
     return input_sequence, noisy
     
+def denoiseSequence3(input, k, alphabet, rho):
+    noisy = deletionChannel(input, rho)
+    context_left = {} 
+    context_right = {}
+    for i in range(k, len(noisy)-k+1):
+        if i < len(noisy)-k:
+            lcontext = noisy[i-k:i]
+            rcontext = noisy[i+1:i+k+1]
+            if lcontext in context_left:
+                context_left[lcontext] += noisy[i]
+            else:
+                context_left[lcontext] = [noisy[i]]
+            if rcontext in context_right:
+                context_right[rcontext] += noisy[i]
+            else:
+                context_right[rcontext] = [noisy[i]]
+    for i in range(k, len(noisy)-k):
+        rcontext = noisy[i+1:i+k+1]
+        lcontext = noisy[i-k+1:i+1]
+        for a in alphabet:
+            rightp1 = sum(context_right[rcontext] == noisy[i])/(len(context_right[rcontext])+0.0)
+            rightp2 = sum(context_right[a+rcontext[:-1]] == noisy[i])/(len(context_right[a+rcontext[:-1]])+0.0)
+            leftp1 = sum(context_left[lcontext] == noisy[i+1])/(len(context_left[lcontext])+0.0)
+            leftp2 = sum(context_left[lcontext] == noisy[i+1])/(len(context_left[lcontext])+0.0)
+            if rightp2*rho >= (1-rho)*rightp1 and leftp2*rho >= (1-rho)*leftp1:
+                noisy = noisy[:i+1]+a+noisy[i+1:]
 
 n = 10000
 rho = 0.01
 k = 2
 alphabet = ['a', 'c', 't', 'g']
-input = open('humangenome.fasta').read()[:n]
-input = takeReads(input)
-erasure_denoised = erasureDenoise(input, k, alphabet, rho) 
-print(1-sum([int(input[i] == erasure_denoised[i]) for i in range(len(input))])/(len(input)+0.0))
+#input = open('humangenome.fasta').read()[:n]
+#input = takeReads(input)
+#erasure_denoised = erasureDenoise(input, k, alphabet, rho) 
+#print(1-sum([int(input[i] == erasure_denoised[i]) for i in range(len(input))])/(len(input)+0.0))
 #input, denoised = denoiseSequence2(input, k, alphabet, rho)
 
