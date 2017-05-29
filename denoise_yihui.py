@@ -71,41 +71,6 @@ def deletionChannel(input_sequence, deletion_rate):
     noisy = "".join([char for index, char in enumerate(input_sequence) if index not in indices])
     return noisy
 
-def erasureDenoise(input_sequence, k, alphabet, deletion_rate):
-    noisy = erasureChannel(input_sequence, deletion_rate)
-    contexts = calculateDistribution(noisy, k, alphabet)
-    ml = alphabet[0]
-    pct = 0
-    for l in alphabet:
-        if sum([int(x == l) for x in noisy])/len(noisy) > pct:
-            pct = sum(noisy == l)/len(noisy)
-            ml = l
-    most_common = ml
-    erasure_corrections = []
-    for j in range(k):
-        if noisy[j] == 'E':
-            erasure_corrections += most_common
-    for i in range(k, len(noisy)-k):
-        if noisy[i] == 'E':
-            p = 0
-            ml = most_common
-            context = noisy[i-k:i]+noisy[i+1:i+k+1]
-            context_hist = contexts[context]
-            for a in alphabet:
-                new_p = sum([int(x == a) for x in context_hist])/len(context_hist)
-                if new_p > p:
-                    p = new_p
-                    ml = a
-            erasure_corrections += ml
-    for m in range(len(noisy)-k, len(noisy)):
-        if noisy[m] == 'E':
-            erasure_corrections += most_common
-    j = 0
-    for i in range(len(noisy)):
-        if noisy[i] == 'E':
-            noisy = noisy[:i]+erasure_corrections[j]+noisy[i+1:]
-            j += 1
-    return noisy
 
 def denoiseSequence1(input_sequence, k, alphabet, deletion_rate):
     noisy = deletionChannel(input_sequence, deletion_rate)
@@ -163,6 +128,41 @@ def denoiseSequence2(input_sequence, k, alphabet, deletion_rate):
 
 ######################################### Deletion and substitution channel ############################################
 
+def newerasureDenoise(noisy, k, alphabet, deletion_rate, erasedsymbol):
+    contexts = calculateDistribution(noisy, k, alphabet)
+    ml = alphabet[0]
+    pct = 0
+    for l in alphabet:
+        if sum([int(x == l) for x in noisy])/len(noisy) > pct:
+            pct = sum(noisy == l)/len(noisy)
+            ml = l
+    most_common = ml
+    erasure_corrections = []
+    for j in range(k):
+        if noisy[j] == erasedsymbol:
+            erasure_corrections += most_common
+    for i in range(k, len(noisy)-k):
+        if noisy[i] == erasedsymbol:
+            p = 0
+            ml = most_common
+            context = noisy[i-k:i]+noisy[i+1:i+k+1]
+            context_hist = contexts[context]
+            for a in alphabet:
+                new_p = sum([int(x == a) for x in context_hist])/len(context_hist)
+                if new_p > p:
+                    p = new_p
+                    ml = a
+            erasure_corrections += ml
+    for m in range(len(noisy)-k, len(noisy)):
+        if noisy[m] == erasedsymbol:
+            erasure_corrections += most_common
+    j = 0
+    for i in range(len(noisy)):
+        if noisy[i] == erasedsymbol:
+            noisy = noisy[:i]+erasure_corrections[j]+noisy[i+1:]
+            j += 1
+    return noisy
+
 def errorrate_delsub(original,estimate):
     pass
 
@@ -174,9 +174,8 @@ def count_symbols(sequence,alphabet):
         counts[i] = sum([int(x == l) for x in sequence])
     return counts
 
-def denoiseSequence3(noisy,k, alphabet, erasedsymbol, ppi, loss): #'noisy' must be a string
+def contexthist_incl_del(noisy,k,erasedsymbol):
     context_hist = {}
-    n = len(noisy)
     for i in range(k, len(noisy)-k+1):
         if i < len(noisy)-k:
             context = noisy[i-k:i]+noisy[i+1:i+k+1]
@@ -189,21 +188,32 @@ def denoiseSequence3(noisy,k, alphabet, erasedsymbol, ppi, loss): #'noisy' must 
                 context_hist[context_del] += erasedsymbol
             else:
                 context_hist[context_del] = [erasedsymbol]
-    
+    return context_hist
+
+def denoiseSequence3(noisy,k, alphabet, ps, pd): #'noisy' must be a string
+    # Create transition and loss matrices based on ps and pd
+    ppi = np.array([[1-ps-pd,ps,pd],[ps,1-ps-pd,pd],[0,0,1]])
+    ll = 1
+    loss = np.array([[0,1,(1+ll)/2.],[1,0,(1+ll)/2.],[ll,ll,0]])
+
+    n = len(noisy)
+    nothingsymbol = 'N'
+    # First pass; collect counts
+    context_hist = contexthist_incl_del(noisy,k,nothingsymbol)    
     # Create a dictionary that tells you what symbol to insert/replace for each context
     new_context_hist = {}
     newalphabet = [i for i in alphabet]
-    newalphabet.extend([erasedsymbol])
+    newalphabet.extend([nothingsymbol])
     for context, symbolswithcontext in context_hist.iteritems():
         symbollist = list(symbolswithcontext)
         values = count_symbols(symbollist, newalphabet)
         new_context_hist[context] = values
-    #print new_context_hist
+    
     newseq = [noisy[:k]]
     # Now, make 'noisy' into a list so it's easier to work with
     noisy = list(noisy)
-    noisy_mod = [[i,erasedsymbol] for i in noisy[k:len(noisy)-k]] #Insert 'nothing' symbols at alternate spots, leaving the first k and last k symbols alone
-    noisy_mod = chain(noisy[:k],[erasedsymbol],noisy_mod,noisy[len(noisy)-k:])
+    noisy_mod = [[i,nothingsymbol] for i in noisy[k:len(noisy)-k]] #Insert 'nothing' symbols at alternate spots, leaving the first k and last k symbols alone
+    noisy_mod = chain(noisy[:k],[nothingsymbol],noisy_mod,noisy[len(noisy)-k:])
     noisy_mod = list(chain.from_iterable(noisy_mod))
     for j in range(k,2*n-3*k+1):
         if (j+1-k)%2 == 0: # It's a symbol in the original
@@ -226,8 +236,48 @@ def denoiseSequence3(noisy,k, alphabet, erasedsymbol, ppi, loss): #'noisy' must 
                 storevals[i] = np.dot(front,np.multiply(loss[:,i],emp_probs))
             newseq.extend(newalphabet[np.argmax(storevals)])
     newseq.extend(noisy[len(noisy)-k:])
-    estimate = [i for i in newseq if i!=erasedsymbol]
+    estimate = [i for i in newseq if i!=nothingsymbol]
     estimate = "".join(estimate)
+    return estimate
+
+def denoiseSequence4(noisy,k, alphabet, ps, pd): # Handles deletions only
+    # DELETION DUDE
+    ppi_deletion = np.array([[1-pd,pd],[0,1]])
+    ll = 1
+    loss = np.array([[0,1],[1,0]])
+    n = len(noisy)
+    # Get the context histogram
+    nothingsymbol = 'N'
+    erasedsymbol = 'E'
+    context_hist = contexthist_incl_del(noisy,k,nothingsymbol)
+    
+    # Create a dictionary that tells you whether to leave it empty or add a symbol there. 
+    new_context_hist = {}
+    newalphabet = [i for i in alphabet]
+    newalphabet.extend([nothingsymbol])
+    for context, symbolswithcontext in context_hist.iteritems():
+        symbollist = list(symbolswithcontext)
+        values = count_symbols(symbollist, newalphabet)
+        values2 = np.array([np.sum(values[:-1]),values[-1]])
+        new_context_hist[context] = values2
+    newalphabet = [erasedsymbol,nothingsymbol] 
+    newseq = [noisy[:k]]
+    # Now, make 'noisy' into a list so it's easier to work with
+    noisy = list(noisy)
+    for j in range(k,n-k):
+        context = ''.join(noisy[j-k:j+k])
+        emp_probs = new_context_hist[context]
+        front = np.dot(emp_probs.T,LA.inv(ppi_deletion))
+        storevals = np.zeros(len(newalphabet))
+        for i in range(len(newalphabet)):
+            storevals[i] = np.dot(front,np.multiply(loss[:,i],emp_probs))
+        newseq.extend([noisy[j],newalphabet[np.argmax(storevals)]])
+    newseq.extend(noisy[len(noisy)-k:])
+    intermediate = [i for i in newseq if i!= nothingsymbol]
+    intermediate = "".join(intermediate)
+    print 'intermediate is', intermediate
+    # ERASURE DUDE
+    estimate = newerasureDenoise(intermediate, k, alphabet, pd, 'E')
     return estimate
 # ################################################## Testing the erasure DUDE ####################################################
 
@@ -256,7 +306,7 @@ W=newW
 X[0] = -1
 currstate = X[0]
 pd = 0.1
-ps = 0.1
+ps = 0.0
 N=np.random.uniform(0,1,n+1)
 N = [0 if i<=pd else -1 if pd<i and i<=pd+ps else 1 if i>pd+ps else i for i in N]
 for ii in range(1,n+1):
@@ -273,11 +323,9 @@ Y = ['a' if i==-1 else 'b' if i==1 else '' for i in Y]
 str_Y = ''.join(Y)
 # Apply the DUDE
 k = 2
-ll = 1
-lossmat = np.array([[0,1,(1+ll)/2.],[1,0,(1+ll)/2.],[ll,ll,0]])
-transitionmat = np.array([[1-ps-pd,ps,pd],[ps,1-ps-pd,pd],[0,0,1]])
 alphabet = ['a','b']
-Yest = denoiseSequence3(str_Y,k,alphabet,erasedsymbol, transitionmat,lossmat)
+Yest = denoiseSequence3(str_Y,k,alphabet, ps, pd)
+
 print 'Original', str_X
-print 'Corrupted', str_Y
+print 'With deletions', str_Y
 print 'Estimate from DUDE', Yest
