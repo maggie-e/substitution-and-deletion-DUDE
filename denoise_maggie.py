@@ -1,5 +1,6 @@
 import random
 import numpy as np
+import math
 
 kmers = []
 read_length = 50
@@ -155,12 +156,12 @@ def denoiseSequence2(input_sequence, k, alphabet, deletion_rate):
                 ml = alphabet[0]
                 p = 0
                 for a in alphabet:
-                    new_p = sum(context_hist[context] == a)/(len(context_hist[context])+0.0)
+                    new_p = sum([int(x == a) for x in context_hist[context]])/(len(context_hist[context])+0.0)
                     if new_p > p:
                         p = new_p
                         ml = a
                 noisy = noisy[:i]+ml+noisy[i:]
-    return input_sequence, noisy
+    return noisy
     
 def denoiseSequence3(input, k, alphabet, rho):
     noisy = deletionChannel(input, rho)
@@ -182,20 +183,42 @@ def denoiseSequence3(input, k, alphabet, rho):
         rcontext = noisy[i+1:i+k+1]
         lcontext = noisy[i-k+1:i+1]
         for a in alphabet:
-            rightp1 = sum(context_right[rcontext] == noisy[i])/(len(context_right[rcontext])+0.0)
-            rightp2 = sum(context_right[a+rcontext[:-1]] == noisy[i])/(len(context_right[a+rcontext[:-1]])+0.0)
-            leftp1 = sum(context_left[lcontext] == noisy[i+1])/(len(context_left[lcontext])+0.0)
-            leftp2 = sum(context_left[lcontext] == noisy[i+1])/(len(context_left[lcontext])+0.0)
+            rightp1 = sum([int(x == noisy[i]) for x in context_right[rcontext]])/(len(context_right[rcontext])+0.0)
+            rightp2 = sum([int(x == noisy[i]) for x in context_right[a+rcontext[:-1]]])/(len(context_right[a+rcontext[:-1]])+0.0)
+            leftp1 = sum([int(x == noisy[i+1]) for x in context_left[lcontext]])/(len(context_left[lcontext])+0.0)
+            leftp2 = sum([int(x == noisy[i+1]) for x in context_left[lcontext[1:]+a]])/(len(context_left[lcontext])+0.0)
             if rightp2*rho >= (1-rho)*rightp1 and leftp2*rho >= (1-rho)*leftp1:
                 noisy = noisy[:i+1]+a+noisy[i+1:]
+    return noisy
 
 n = 10000
-rho = 0.01
+display = 50
 k = 2
-alphabet = ['a', 'c', 't', 'g']
-#input = open('humangenome.fasta').read()[:n]
-#input = takeReads(input)
-#erasure_denoised = erasureDenoise(input, k, alphabet, rho) 
-#print(1-sum([int(input[i] == erasure_denoised[i]) for i in range(len(input))])/(len(input)+0.0))
-#input, denoised = denoiseSequence2(input, k, alphabet, rho)
-
+a = 0.3                                                                                                                                                                              
+eps = 0.1                                                                                                                                                                           
+print 'a: ', a, ' epsilon: ', eps
+alphabet = ['+', '-']
+p = random.random()
+k = int(0.5*math.log(n, 3))
+print 'k = ', k
+x = ''
+for i in range(n):
+    if i == 0:
+        if p < 0.5:
+            x += '+'
+        else:
+            x += '-'
+    else:
+        if p > a:
+            if x[i-1] == '+':
+                x += '-'
+            else:
+                x += '+'
+        else:
+            x += x[i-1]
+        p = random.random()
+est1 = denoiseSequence2(x, k, alphabet, eps)
+est2 = denoiseSequence3(x, k, alphabet, eps)
+print 'Original: ', x[:display], '(length ', len(x), ')'
+print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ')'
+print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ')'
