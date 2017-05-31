@@ -4,8 +4,8 @@ import math
 import denoise_yihui #import denoiseSequence3
 
 kmers = []
-read_length = 50
-num_reads = 10000
+read_length = 100
+num_reads = 1000000
 
 def allklength(k, alphabet):
     allklengthHelper(k, alphabet, "")
@@ -25,6 +25,9 @@ def takeReads(genome):
         index = int(random.random()*(len(genome)-read_length))
         concatenated += genome[index:index+read_length]
     return concatenated
+
+def kEntropy(input, k, alphabet):
+    return 0
 
 def calculateMatrix(input_sequence, k, alphabet):
     matrix_dim = len(alphabet)**k;
@@ -182,9 +185,19 @@ def denoiseSequence2(noisy, k, alphabet, deletion_rate):
                 noisy = noisy[:i]+ml+noisy[i:]
     return noisy
     
+def optimalDenoise(noisy, k, alphabet, rho, alpha):
+    for i in range(len(noisy)-1):
+        if noisy[i] == noisy[i+1] and rho*(1-alpha)**2/alpha > 1:
+            if noisy[i] == alphabet[0]:
+                noisy = noisy[:i+1]+alphabet[1]+noisy[i+1:]
+            else:
+                noisy = noisy[:i+1]+alphabet[0]+noisy[i+1:]
+    return noisy
+        
+
 def denoiseSequence3(noisy, k, alphabet, rho):
     #noisy = deletionChannel(input, rho)
-    adjust = 2
+    adjust = 1
     context_left = {} 
     context_right = {}
     for i in range(k, len(noisy)-k+1):
@@ -211,9 +224,9 @@ def denoiseSequence3(noisy, k, alphabet, rho):
                 noisy = noisy[:i+1]+a+noisy[i+1:]
     return noisy
 
-n = 1000
+n = 10000
 display = 50
-k = 2
+k = 4
 a = 0.3                                                                                                                                                                              
 eps = 0.1                                                                                                                                                                           
 print 'a: ', a, ' epsilon: ', eps
@@ -221,7 +234,8 @@ alphabet = ['+', '-']
 p = random.random()
 #k = int(0.5*math.log(n, 3))
 #print 'k = ', k
-x = ''
+x = ''#'+--+--'*2500
+
 for i in range(n):
     if i == 0:
         if p < 0.5:
@@ -241,19 +255,21 @@ for i in range(n):
 noisy = deletionChannel(x, eps)
 bestK = 0
 minErr = 1
-#est1 = denoiseSequence2(noisy, k, alphabet, eps)
-for k in range(1, 8):
-    est1 = denoiseSequence2(noisy, k, alphabet, eps)
-    err = levenshtein(est1, x)/(n+0.0)
-    print err
-    if err <= minErr:
-        minErr = err
-        bestK = k
-print 'Minimum error for Denoiser 1 is ', minErr, ' with k = ', bestK
+est1 = denoiseSequence2(noisy, k, alphabet, eps)
+#for k in range(1, 10):
+#    est1 = denoiseSequence2(noisy, k, alphabet, eps)
+#    err = levenshtein(est1, x)/(n+0.0)
+#    print err
+#    if err <= minErr:
+#        minErr = err
+#        bestK = k
+#print 'Minimum error for Denoiser 1 is ', minErr, ' with k = ', bestK
 #est2 = denoiseSequence3(noisy, k, alphabet, eps)
 #est3 = denoise_yihui.denoiseSequence3(noisy, k, alphabet, 0, eps)
-#print 'Original: ', x[:display], '(length ', len(x), ' error ', levenshtein(x, x)/(n+0.0), ')'
-#print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', levenshtein(noisy, x)/(n+0.0), ')'
-#print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
+est = optimalDenoise(noisy, k, alphabet, eps, a)
+print 'Original: ', x[:display], '(length ', len(x), ' error ', levenshtein(x, x)/(n+0.0), ')'
+print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', levenshtein(noisy, x)/(n+0.0), ')'
+print 'Denoised: ', est[:display], '(length ', len(est), ' error ', levenshtein(est, x)/(n+0.0), ' )'
+print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
 #print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', levenshtein(est2, x)/(n+0.0), ')'
 #print 'Denoiser 3: ', est3[:display], '(length ', len(est3), ' error ', levenshtein(est3, x)/(n+0.0), ')'
