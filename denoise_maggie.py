@@ -153,7 +153,7 @@ def denoiseSequence1(input_sequence, k, alphabet, deletion_rate):
 
 def denoiseSequence2(noisy, k, alphabet, deletion_rate):
     #noisy = deletionChannel(input_sequence, deletion_rate)
-    adjust = 2
+    adjust = 1
     context_hist = {}
     context_del_hist = {}
     for i in range(k, len(noisy)-k+1):
@@ -211,7 +211,7 @@ def denoiseSequence3(noisy, k, alphabet, rho):
                 noisy = noisy[:i+1]+a+noisy[i+1:]
     return noisy
 
-n = 10000
+n = 1000
 display = 50
 k = 2
 a = 0.3                                                                                                                                                                              
@@ -219,8 +219,8 @@ eps = 0.1
 print 'a: ', a, ' epsilon: ', eps
 alphabet = ['+', '-']
 p = random.random()
-k = int(0.5*math.log(n, 3))
-print 'k = ', k
+#k = int(0.5*math.log(n, 3))
+#print 'k = ', k
 x = ''
 for i in range(n):
     if i == 0:
@@ -239,11 +239,21 @@ for i in range(n):
         p = random.random()
 
 noisy = deletionChannel(x, eps)
-est1 = denoiseSequence2(noisy, k, alphabet, eps)
-est2 = denoiseSequence3(noisy, k, alphabet, eps)
-est3 = denoise_yihui.denoiseSequence3(noisy, k, alphabet, 0, eps)
-print 'Original: ', x[:display], '(length ', len(x), ' error ', levenshtein(x, x)/(n+0.0), ')'
-print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', levenshtein(noisy, x)/(n+0.0), ')'
-print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
-print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', levenshtein(est2, x)/(n+0.0), ')'
-print 'Denoiser 3: ', est3[:display], '(length ', len(est3), ' error ', levenshtein(est3, x)/(n+0.0), ')'
+bestK = 0
+minErr = 1
+#est1 = denoiseSequence2(noisy, k, alphabet, eps)
+for k in range(1, 8):
+    est1 = denoiseSequence2(noisy, k, alphabet, eps)
+    err = levenshtein(est1, x)/(n+0.0)
+    print err
+    if err <= minErr:
+        minErr = err
+        bestK = k
+print 'Minimum error for Denoiser 1 is ', minErr, ' with k = ', bestK
+#est2 = denoiseSequence3(noisy, k, alphabet, eps)
+#est3 = denoise_yihui.denoiseSequence3(noisy, k, alphabet, 0, eps)
+#print 'Original: ', x[:display], '(length ', len(x), ' error ', levenshtein(x, x)/(n+0.0), ')'
+#print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', levenshtein(noisy, x)/(n+0.0), ')'
+#print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
+#print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', levenshtein(est2, x)/(n+0.0), ')'
+#print 'Denoiser 3: ', est3[:display], '(length ', len(est3), ' error ', levenshtein(est3, x)/(n+0.0), ')'
