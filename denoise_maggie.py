@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import math
+import denoise_yihui #import denoiseSequence3
 
 kmers = []
 read_length = 50
@@ -106,8 +107,25 @@ def erasureDenoise(input_sequence, k, alphabet, deletion_rate):
             j += 1
     return noisy
 
-def levenshteinDistance(x, y):
-    return 0
+def levenshtein(source, target):
+    if len(source) < len(target):
+        return levenshtein(target, source)
+    if len(target) == 0:
+        return len(source)
+    source = np.array(tuple(source))
+    target = np.array(tuple(target))
+    previous_row = np.arange(target.size + 1)
+    for s in source:
+        current_row = previous_row + 1
+        current_row[1:] = np.minimum(
+                current_row[1:],
+                np.add(previous_row[:-1], target != s))
+        current_row[1:] = np.minimum(
+                current_row[1:],
+                current_row[0:-1] + 1)
+        previous_row = current_row
+    return previous_row[-1]
+
 
 def denoiseSequence1(input_sequence, k, alphabet, deletion_rate):
     noisy = deletionChannel(input_sequence, deletion_rate)
@@ -133,8 +151,9 @@ def denoiseSequence1(input_sequence, k, alphabet, deletion_rate):
         denoised += noisy[i]
     return input_sequence, noisy, denoised
 
-def denoiseSequence2(input_sequence, k, alphabet, deletion_rate):
-    noisy = deletionChannel(input_sequence, deletion_rate)
+def denoiseSequence2(noisy, k, alphabet, deletion_rate):
+    #noisy = deletionChannel(input_sequence, deletion_rate)
+    adjust = 2
     context_hist = {}
     context_del_hist = {}
     for i in range(k, len(noisy)-k+1):
@@ -152,7 +171,7 @@ def denoiseSequence2(input_sequence, k, alphabet, deletion_rate):
     for i in range(k, len(noisy)-k):
         context = noisy[i-k:i+k]
         if context in context_hist and context in context_del_hist:
-            if deletion_rate*len(context_hist[context]) >= (1-deletion_rate)*context_del_hist[context]:
+            if adjust*deletion_rate*len(context_hist[context]) >= (1.0/adjust)*(1-deletion_rate)*context_del_hist[context]:
                 ml = alphabet[0]
                 p = 0
                 for a in alphabet:
@@ -163,8 +182,9 @@ def denoiseSequence2(input_sequence, k, alphabet, deletion_rate):
                 noisy = noisy[:i]+ml+noisy[i:]
     return noisy
     
-def denoiseSequence3(input, k, alphabet, rho):
-    noisy = deletionChannel(input, rho)
+def denoiseSequence3(noisy, k, alphabet, rho):
+    #noisy = deletionChannel(input, rho)
+    adjust = 2
     context_left = {} 
     context_right = {}
     for i in range(k, len(noisy)-k+1):
@@ -187,7 +207,7 @@ def denoiseSequence3(input, k, alphabet, rho):
             rightp2 = sum([int(x == noisy[i]) for x in context_right[a+rcontext[:-1]]])/(len(context_right[a+rcontext[:-1]])+0.0)
             leftp1 = sum([int(x == noisy[i+1]) for x in context_left[lcontext]])/(len(context_left[lcontext])+0.0)
             leftp2 = sum([int(x == noisy[i+1]) for x in context_left[lcontext[1:]+a]])/(len(context_left[lcontext])+0.0)
-            if rightp2*rho >= (1-rho)*rightp1 and leftp2*rho >= (1-rho)*leftp1:
+            if adjust*rho*rightp2 >= (1-rho)*(1.0/adjust)*rightp1 or adjust*rho*leftp2 >= (1-rho)*(1.0/adjust)*leftp1:
                 noisy = noisy[:i+1]+a+noisy[i+1:]
     return noisy
 
@@ -217,8 +237,13 @@ for i in range(n):
         else:
             x += x[i-1]
         p = random.random()
-est1 = denoiseSequence2(x, k, alphabet, eps)
-est2 = denoiseSequence3(x, k, alphabet, eps)
-print 'Original: ', x[:display], '(length ', len(x), ')'
-print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ')'
-print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ')'
+
+noisy = deletionChannel(x, eps)
+est1 = denoiseSequence2(noisy, k, alphabet, eps)
+est2 = denoiseSequence3(noisy, k, alphabet, eps)
+est3 = denoise_yihui.denoiseSequence3(noisy, k, alphabet, 0, eps)
+print 'Original: ', x[:display], '(length ', len(x), ' error ', levenshtein(x, x)/(n+0.0), ')'
+print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', levenshtein(noisy, x)/(n+0.0), ')'
+print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
+print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', levenshtein(est2, x)/(n+0.0), ')'
+print 'Denoiser 3: ', est3[:display], '(length ', len(est3), ' error ', levenshtein(est3, x)/(n+0.0), ')'
