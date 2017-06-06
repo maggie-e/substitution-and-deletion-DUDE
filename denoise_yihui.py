@@ -194,7 +194,7 @@ def denoiseSequence3(noisy,k, alphabet, ps, pd): #'noisy' must be a string
     # Create transition and loss matrices based on ps and pd
     ppi = np.array([[1-ps-pd,ps,pd],[ps,1-ps-pd,pd],[0,0,1]])
     ll = 1
-    loss = np.array([[0,1,(1+ll)/2.],[1,0,(1+ll)/2.],[ll,ll,0]])
+    loss = np.array([[0,1,(1+ll)/10.],[1,0,(1+ll)/10.],[ll,ll,0]])
 
     n = len(noisy)
     nothingsymbol = 'N'
@@ -326,6 +326,6 @@ k = 2
 alphabet = ['a','b']
 Yest = denoiseSequence3(str_Y,k,alphabet, ps, pd)
 
-print 'Original', str_X
-print 'With deletions', str_Y
-print 'Estimate from DUDE', Yest
+print 'Original', len(str_X)
+print 'With deletions', len(str_Y)
+print 'Estimate from DUDE', len(Yest)

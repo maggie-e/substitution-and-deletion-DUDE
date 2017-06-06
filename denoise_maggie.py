@@ -2,7 +2,9 @@ import random
 import numpy as np
 import math
 import denoise_yihui #import denoiseSequence3
+import warnings
 
+global kmers
 kmers = []
 read_length = 100
 num_reads = 1000000
@@ -157,32 +159,36 @@ def denoiseSequence1(input_sequence, k, alphabet, deletion_rate):
 def denoiseSequence2(noisy, k, alphabet, deletion_rate):
     #noisy = deletionChannel(input_sequence, deletion_rate)
     adjust = 1
-    context_hist = {}
-    context_del_hist = {}
-    for i in range(k, len(noisy)-k+1):
-        if i < len(noisy)-k:
-            context = noisy[i-k:i]+noisy[i+1:i+k+1]
-            if context in context_hist:
-                context_hist[context] += noisy[i]
+    max_del = 4
+    context_hists = []
+    for j in range(max_del):
+        context_del_hist = {}
+        for i in range(k+j, len(noisy)-k):
+            context_del = noisy[i-k-j:i-j]+noisy[i:i+k]
+            deleted = noisy[i-j:i]
+            if context_del in context_del_hist:
+                context_del_hist[context_del].append(deleted)
             else:
-                context_hist[context] = [noisy[i]]
-        context_del = noisy[i-k:i+k]
-        if context_del in context_del_hist:
-            context_del_hist[context_del] = context_del_hist[context_del] + 1
-        else:
-            context_del_hist[context_del] = 1
-    for i in range(k, len(noisy)-k):
-        context = noisy[i-k:i+k]
-        if context in context_hist and context in context_del_hist:
-            if adjust*deletion_rate*len(context_hist[context]) >= (1.0/adjust)*(1-deletion_rate)*context_del_hist[context]:
-                ml = alphabet[0]
-                p = 0
-                for a in alphabet:
-                    new_p = sum([int(x == a) for x in context_hist[context]])/(len(context_hist[context])+0.0)
-                    if new_p > p:
-                        p = new_p
-                        ml = a
-                noisy = noisy[:i]+ml+noisy[i:]
+                context_del_hist[context_del] = [deleted]
+        context_hists.append(context_del_hist)
+    for j in range(1, max_del):
+        allklength(j, alphabet)
+        for i in range(k, len(noisy)-k):
+            context = noisy[i-k:i+k]
+            context_del_hist = context_hists[j]
+            context_hist = context_hists[0]
+            if context in context_hist and context in context_del_hist:
+                if adjust*(deletion_rate**j)*len(context_hist[context]) >= (1.0/adjust)*(1-deletion_rate)*len(context_del_hist[context]):
+                    ml = kmers[0]
+                    p = 0
+                    for a in kmers:
+                        new_p = sum([int(x == a) for x in context_hist[context]])/(len(context_hist[context])+0.0)
+                        if new_p > p:
+                            p = new_p
+                            ml = a
+                    noisy = noisy[:i]+ml+noisy[i:]
+        global kmers
+        kmers = []
     return noisy
     
 def optimalDenoise(noisy, k, alphabet, rho, alpha):
@@ -224,18 +230,18 @@ def denoiseSequence3(noisy, k, alphabet, rho):
                 noisy = noisy[:i+1]+a+noisy[i+1:]
     return noisy
 
-n = 10000
+
+n = 15000
 display = 50
 k = 4
-a = 0.3                                                                                                                                                                              
-eps = 0.1                                                                                                                                                                           
+a = 0.8
+eps = 0.1 
 print 'a: ', a, ' epsilon: ', eps
 alphabet = ['+', '-']
 p = random.random()
 #k = int(0.5*math.log(n, 3))
 #print 'k = ', k
-x = ''#'+--+--'*2500
-
+x = ''
 for i in range(n):
     if i == 0:
         if p < 0.5:
@@ -251,7 +257,6 @@ for i in range(n):
         else:
             x += x[i-1]
         p = random.random()
-
 noisy = deletionChannel(x, eps)
 bestK = 0
 minErr = 1
@@ -273,3 +278,4 @@ print 'Denoised: ', est[:display], '(length ', len(est), ' error ', levenshtein(
 print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
 #print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', levenshtein(est2, x)/(n+0.0), ')'
 #print 'Denoiser 3: ', est3[:display], '(length ', len(est3), ' error ', levenshtein(est3, x)/(n+0.0), ')'
+
