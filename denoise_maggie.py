@@ -129,6 +129,19 @@ def levenshtein(source, target):
         previous_row = current_row
     return previous_row[-1]
 
+def error(source, target):
+    if len(source) < len(target):
+        return error(target, source)
+    if len(target) == 0:
+        return len(source)
+    errors = 0
+    j = 0
+    for i in range(len(source)):
+        if source[i] != target[j]:
+            errors += 1
+        else:
+            j += 1
+    return errors
 
 def denoiseSequence1(input_sequence, k, alphabet, deletion_rate):
     noisy = deletionChannel(input_sequence, deletion_rate)
@@ -244,7 +257,6 @@ f.close()
 f = open('kama_sutra_noisy', 'w')
 f.write(noisy)
 f.close()
-'''
 
 n = 1000000
 display = 50
@@ -293,3 +305,4 @@ for a in alphas:
         #print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
         print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', levenshtein(est2, x)/(n+0.0), ')'
         print '\n'*5
+'''
