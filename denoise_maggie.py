@@ -220,12 +220,13 @@ def denoiseSequence3(noisy, k, alphabet, rho):
         rcontext = noisy[i+1:i+k+1]
         lcontext = noisy[i-k+1:i+1]
         for a in alphabet:
-            rightp1 = sum([int(x == noisy[i]) for x in context_right[rcontext]])/(len(context_right[rcontext])+0.0)
-            rightp2 = sum([int(x == noisy[i]) for x in context_right[a+rcontext[:-1]]])/(len(context_right[a+rcontext[:-1]])+0.0)
-            leftp1 = sum([int(x == noisy[i+1]) for x in context_left[lcontext]])/(len(context_left[lcontext])+0.0)
-            leftp2 = sum([int(x == noisy[i+1]) for x in context_left[lcontext[1:]+a]])/(len(context_left[lcontext])+0.0)
-            if adjust*rho*rightp2 >= (1-rho)*(1.0/adjust)*rightp1 or adjust*rho*leftp2 >= (1-rho)*(1.0/adjust)*leftp1:
-                noisy = noisy[:i+1]+a+noisy[i+1:]
+            if a+rcontext[:-1] in context_right and lcontext[1:]+a in context_left:
+                rightp1 = sum([int(x == noisy[i]) for x in context_right[rcontext]])/(len(context_right[rcontext])+0.0)
+                rightp2 = sum([int(x == noisy[i]) for x in context_right[a+rcontext[:-1]]])/(len(context_right[a+rcontext[:-1]])+0.0)
+                leftp1 = sum([int(x == noisy[i+1]) for x in context_left[lcontext]])/(len(context_left[lcontext])+0.0)
+                leftp2 = sum([int(x == noisy[i+1]) for x in context_left[lcontext[1:]+a]])/(len(context_left[lcontext])+0.0)
+                if adjust*rho*rightp2 >= (1-rho)*(1.0/adjust)*rightp1 or adjust*rho*leftp2 >= (1-rho)*(1.0/adjust)*leftp1:
+                    noisy = noisy[:i+1]+a+noisy[i+1:]
     return noisy
 #Text denoising
 '''
@@ -274,7 +275,7 @@ for a in alphas:
         noisy = deletionChannel(x, eps)
 #bestK = 0
 #minErr = 1
-        est1 = denoiseSequence2(noisy, k, alphabet, eps)
+        #est1 = denoiseSequence2(noisy, k, alphabet, eps)
 #for k in range(1, 10):
 #    est1 = denoiseSequence2(noisy, k, alphabet, eps)
 #    err = levenshtein(est1, x)/(n+0.0)
@@ -283,12 +284,12 @@ for a in alphas:
 #        minErr = err
 #        bestK = k
 #print 'Minimum error for Denoiser 1 is ', minErr, ' with k = ', bestK
-        #est2 = denoiseSequence3(noisy, k, alphabet, eps)
+        est2 = denoiseSequence3(noisy, k, alphabet, eps)
         est = optimalDenoise(noisy, k, alphabet, eps, a)
         print 'Setting: alpha = ', a, ', epsilon = ', eps 
         print 'Original: ', x[:display], '(length ', len(x), ' error ', levenshtein(x, x)/(n+0.0), ')'
         print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', levenshtein(noisy, x)/(n+0.0), ')'
         print 'Denoised: ', est[:display], '(length ', len(est), ' error ', levenshtein(est, x)/(n+0.0), ' )'
-        print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
-        #print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', levenshtein(est2, x)/(n+0.0), ')'
+        #print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
+        print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', levenshtein(est2, x)/(n+0.0), ')'
         print '\n'*5
