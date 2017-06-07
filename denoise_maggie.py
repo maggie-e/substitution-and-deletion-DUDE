@@ -137,7 +137,9 @@ def error(source, target):
     errors = 0
     j = 0
     for i in range(len(source)):
-        if source[i] != target[j]:
+        if j >= len(target):
+            errors += 1
+        elif source[i] != target[j]:
             errors += 1
         else:
             j += 1
@@ -241,22 +243,22 @@ def denoiseSequence3(noisy, k, alphabet, rho):
                 if adjust*rho*rightp2 >= (1-rho)*(1.0/adjust)*rightp1 or adjust*rho*leftp2 >= (1-rho)*(1.0/adjust)*leftp1:
                     noisy = noisy[:i+1]+a+noisy[i+1:]
     return noisy
-#Text denoising
-'''
-ks = open('kama_sutra_regex', 'r').read()
-n = len(ks)
-k = int(0.5*math.log(n, 3))
-eps = 0.01
-alphabet = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ')
-noisy = deletionChannel(ks, eps)
-est1 = denoiseSequence2(noisy, k, alphabet, eps)
-#est2 = denoiseSequence3(noisy, k, alphabet, eps)
-f = open('kama_sutra_denoised_1', 'w')
-f.write(est1)
-f.close()
-f = open('kama_sutra_noisy', 'w')
-f.write(noisy)
-f.close()
+
+def text_denoise(filename):
+    n = 10000
+    ks = open(filename, 'r').read()[:n]
+    k = int(0.5*math.log(n, 3))
+    eps = 0.1
+    alphabet = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ')
+    noisy = deletionChannel(ks, eps)
+    est1 = denoiseSequence2(noisy, k, alphabet, eps)
+    f = open(filename+'_denoised_1', 'w')
+    f.write(est1)
+    f.close()
+    f = open(filename+'_noisy', 'w')
+    f.write(noisy)
+    f.close()
+
 
 n = 1000000
 display = 50
@@ -299,10 +301,10 @@ for a in alphas:
         est2 = denoiseSequence3(noisy, k, alphabet, eps)
         est = optimalDenoise(noisy, k, alphabet, eps, a)
         print 'Setting: alpha = ', a, ', epsilon = ', eps 
-        print 'Original: ', x[:display], '(length ', len(x), ' error ', levenshtein(x, x)/(n+0.0), ')'
-        print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', levenshtein(noisy, x)/(n+0.0), ')'
-        print 'Denoised: ', est[:display], '(length ', len(est), ' error ', levenshtein(est, x)/(n+0.0), ' )'
+        print 'Original: ', x[:display], '(length ', len(x), ' error ', error(x, x)/(n+0.0), ')'
+        print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, x)/(n+0.0), ')'
+        print 'Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, x)/(n+0.0), ' )'
         #print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
-        print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', levenshtein(est2, x)/(n+0.0), ')'
+        print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', error(est2, x)/(n+0.0), ')'
         print '\n'*5
-'''
+
