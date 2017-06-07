@@ -206,7 +206,7 @@ def denoiseSequence2(noisy, k, alphabet, deletion_rate):
     
 def optimalDenoise(noisy, k, alphabet, rho, alpha):
     for i in range(len(noisy)-1):
-        if noisy[i] == noisy[i+1] and rho*(1-alpha)**2/alpha > 1:
+        if noisy[i] == noisy[i+1] and rho*alpha**2/(1-alpha) > 1:
             if noisy[i] == alphabet[0]:
                 noisy = noisy[:i+1]+alphabet[1]+noisy[i+1:]
             else:
@@ -260,11 +260,11 @@ def text_denoise(filename):
     f.close()
 
 
-n = 1000000
+n = 10000
 display = 50
 #k = 4
-alphas = [0.01, 0.05, 0.1, 0.15, 0.2]
-epsilons = [0.01, 0.1, 0.2]
+alphas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5]
+epsilons = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5]
 alphabet = ['+', '-']
 p = random.random()
 k = int(0.5*math.log(n, 3))
@@ -304,7 +304,7 @@ for a in alphas:
         print 'Original: ', x[:display], '(length ', len(x), ' error ', error(x, x)/(n+0.0), ')'
         print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, x)/(n+0.0), ')'
         print 'Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, x)/(n+0.0), ' )'
-        #print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', levenshtein(est1, x)/(n+0.0), ')'
+        #print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', error(est1, x)/(n+0.0), ')'
         print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', error(est2, x)/(n+0.0), ')'
         print '\n'*5
 
