@@ -240,11 +240,11 @@ def denoiseSequence3(noisy, k, alphabet, rho):
                 rightp2 = sum([int(x == noisy[i]) for x in context_right[a+rcontext[:-1]]])/(len(context_right[a+rcontext[:-1]])+0.0)
                 leftp1 = sum([int(x == noisy[i+1]) for x in context_left[lcontext]])/(len(context_left[lcontext])+0.0)
                 leftp2 = sum([int(x == noisy[i+1]) for x in context_left[lcontext[1:]+a]])/(len(context_left[lcontext])+0.0)
-                if adjust*rho*rightp2 >= (1-rho)*(1.0/adjust)*rightp1 or adjust*rho*leftp2 >= (1-rho)*(1.0/adjust)*leftp1:
+                if adjust*rho*rightp2 >= (1-rho)*(1.0/adjust)*rightp1 and adjust*rho*leftp2 >= (1-rho)*(1.0/adjust)*leftp1:
                     noisy = noisy[:i+1]+a+noisy[i+1:]
     return noisy
 
-def text_denoise(filename):
+def textDenoise(filename):
     n = 10000
     ks = open(filename, 'r').read()[:n]
     k = int(0.5*math.log(n, 3))
@@ -259,52 +259,39 @@ def text_denoise(filename):
     f.write(noisy)
     f.close()
 
-
-n = 10000
-display = 50
-#k = 4
-alphas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5]
-epsilons = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5]
-alphabet = ['+', '-']
-p = random.random()
-k = int(0.5*math.log(n, 3))
-for a in alphas:
-    for eps in epsilons:
-        x = ''
-        for i in range(n):
-            if i == 0:
-                if p < 0.5:
-                    x += '+'
-                else:
-                    x += '-'
+def markovSourceDenoise(a, eps):
+    n = 10000
+    display = 50
+    alphabet = ['+', '-']
+    p = random.random()
+    k = int(0.5*math.log(n, 3))
+    x = ''
+    for i in range(n):
+        if i == 0:
+            if p < 0.5:
+                x += '+'
             else:
-                if p < a:
-                    if x[i-1] == '+':
-                        x += '-'
-                    else:
-                        x += '+'
+                x += '-'
+        else:
+            if p < a:
+                if x[i-1] == '+':
+                    x += '-'
                 else:
-                    x += x[i-1]
+                    x += '+'
+            else:
+                x += x[i-1]
             p = random.random()
-        noisy = deletionChannel(x, eps)
-#bestK = 0
-#minErr = 1
-        #est1 = denoiseSequence2(noisy, k, alphabet, eps)
-#for k in range(1, 10):
-#    est1 = denoiseSequence2(noisy, k, alphabet, eps)
-#    err = levenshtein(est1, x)/(n+0.0)
-#    print err
-#    if err <= minErr:
-#        minErr = err
-#        bestK = k
-#print 'Minimum error for Denoiser 1 is ', minErr, ' with k = ', bestK
-        est2 = denoiseSequence3(noisy, k, alphabet, eps)
-        est = optimalDenoise(noisy, k, alphabet, eps, a)
-        print 'Setting: alpha = ', a, ', epsilon = ', eps 
-        print 'Original: ', x[:display], '(length ', len(x), ' error ', error(x, x)/(n+0.0), ')'
-        print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, x)/(n+0.0), ')'
-        print 'Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, x)/(n+0.0), ' )'
-        #print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', error(est1, x)/(n+0.0), ')'
-        print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', error(est2, x)/(n+0.0), ')'
-        print '\n'*5
+    noisy = deletionChannel(x, eps)
+    est1 = denoiseSequence2(noisy, k, alphabet, eps)
+    est2 = denoiseSequence2(noisy, k, alphabet, eps)
+    est = optimalDenoise(noisy, k, alphabet, eps, a)
+    print 'Setting: alpha = ', a, ', epsilon = ', eps 
+    print 'Original: ', x[:display], '(length ', len(x), ' error ', error(x, x)/(n+0.0), ')'
+    print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, x)/(n+0.0), ')'
+    print 'Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, x)/(n+0.0), ' )'
+    print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', error(est1, x)/(n+0.0), ')'
+    print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', error(est2, x)/(n+0.0), ')'
+    print '\n'*5
+
+
 
