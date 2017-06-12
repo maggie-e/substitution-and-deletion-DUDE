@@ -221,34 +221,37 @@ def denoiseSequence3(noisy, k, alphabet, rho, l=-1):
         l = k
     context_left = {} 
     context_right = {}
-    for i in range(k, len(noisy)-k+1):
-        if i < len(noisy)-k:
+    for i in range(len(noisy)):
+        if i >= k:
             lcontext = noisy[i-k:i]
-            rcontext = noisy[i+1:i+k+1]
             if lcontext in context_left:
                 context_left[lcontext] += noisy[i]
             else:
                 context_left[lcontext] = [noisy[i]]
+        if i < len(noisy)-k:
+            rcontext = noisy[i+1:i+k+1]
             if rcontext in context_right:
                 context_right[rcontext] += noisy[i]
             else:
                 context_right[rcontext] = [noisy[i]]
-    for i in range(k, len(noisy)-k):
-        context1 = noisy[i-k+1:i+k+1]
+    for i in range(k, len(noisy)-k-1):
+        context1 = noisy[i-k+1:i+k+2]
         for a in alphabet:
             vote = 0
-            context2 = noisy[i-k:i+1]+a+noisy[i+1:i+k+1]
+            context2 = noisy[i-k+1:i+1]+a+noisy[i+1:i+k+1]
             if a+rcontext[:-1] in context_right and lcontext[1:]+a in context_left:
                 for x in range(l):
-                    p1 = sum([int(y == noisy[i-x]) for y in context_right[context1[i-x+1:i-x+k]]])
-                    p2 = sum([int(y == noisy[i-x]) for y in context_right[context2[i-x+1:i-x+k]]])
-                    if (1-rho)*p1 <= rho*p2:
-                        vote += 1
+                    if context2[i-x+1:i-x+k] in context_right:
+                        p1 = sum([int(y == noisy[i-x]) for y in context_right[context1[i-x+1:i-x+k+1]]])
+                        p2 = sum([int(y == noisy[i-x]) for y in context_right[context2[i-x+1:i-x+k+1]]])
+                        if (1-rho)*p1 <= rho*p2:
+                            vote += 1
                 for x in range(l):
-                    p1 = sum([int(y == noisy[i+x]) for y in context_left[context1[i+x-k:i+x]]]) 
-                    p2 = sum([int(y == noisy[i+x]) for y in context_left[context2[i+x-k:i+x]]])
-                    if (1-rho)*p1 <= rho*p2:
-                        vote += 1
+                    if context2[i+x-k:i+x] in context_left:
+                        p1 = sum([int(y == noisy[i+x]) for y in context_left[context1[i+x-k:i+x]]]) 
+                        p2 = sum([int(y == noisy[i+x]) for y in context_left[context2[i+x-k:i+x]]])
+                        if (1-rho)*p1 <= rho*p2:
+                            vote += 1
                 if vote >= l:
                     noisy = noisy[:i+1]+a+noisy[i+1:]
     return noisy
@@ -269,7 +272,7 @@ def textDenoise(filename):
     f.close()
 
 def markovSourceDenoise(a, eps):
-    n = 100000
+    n = 10000
     display = 50
     alphabet = ['+', '-']
     p = random.random()
@@ -291,19 +294,19 @@ def markovSourceDenoise(a, eps):
                 x += x[i-1]
             p = random.random()
     noisy = deletionChannel(x, eps)
-    est1 = denoiseSequence2(noisy, k, alphabet, eps)
-    est2 = denoiseSequence2(noisy, k, alphabet, eps)
+    #est1 = denoiseSequence2(noisy, k, alphabet, eps)
+    est2 = denoiseSequence3(noisy, k, alphabet, eps)
     est = optimalDenoise(noisy, k, alphabet, eps, a)
     print 'Setting: alpha = ', a, ', epsilon = ', eps 
     print 'Original: ', x[:display], '(length ', len(x), ' error ', error(x, x)/(n+0.0), ')'
     print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, x)/(n+0.0), ')'
     print 'Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, x)/(n+0.0), ' )'
-    print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', error(est1, x)/(n+0.0), ')'
+    #print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', error(est1, x)/(n+0.0), ')'
     print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', error(est2, x)/(n+0.0), ')'
     print '\n'*5
 
-alphas = [0.01, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
-epsilons = [0.01, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
-#for i in range(len(alphas)):
-#    for j in range(len(epsilons)):
-#        markovSourceDenoise(alphas[i], epsilons[j])            
+alphas = [0.5]#, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
+epsilons = [0.01]#, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
+for i in range(len(alphas)):
+    for j in range(len(epsilons)):
+        markovSourceDenoise(alphas[i], epsilons[j])            
