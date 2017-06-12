@@ -274,7 +274,7 @@ def textDenoise(filename):
     f.close()
 
 def weightWrapper(weights):
-    a = 0.5
+    a = 0.9
     eps = 0.2
     max_del = 1
     n = 10000
@@ -299,7 +299,8 @@ def weightWrapper(weights):
             p = random.random()
     noisy = deletionChannel(x, eps)
     est1 = denoiseSequence2(noisy, k, alphabet, eps, max_del, weights)
-    err = error(est1, x)/(n+0.0)
+    est = optimalDenoise(noisy, k, alphabet, eps, a)
+    err = error(est, x)/(n+0.0)-error(est1, x)/(n+0.0)
     return err
     
 
@@ -341,10 +342,9 @@ def markovSourceDenoise(a, eps):
 #epsilons = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
 #for i in range(len(alphas)):
 #    for j in range(len(epsilons)):
-#        markovSourceDenoise(alphas[i], epsilons[j])            
-
+#        markovSourceDenoise(alphas[i], epsilons[j])
 l = CMAES(weightWrapper, [1])
 l.minimize = True
-l.maxEvaluations = 50
+l.maxEvaluations = 100
 optval = l.learn()
 print(optval)
