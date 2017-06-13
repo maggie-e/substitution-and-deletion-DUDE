@@ -4,9 +4,14 @@ import math
 from pybrain.optimization import CMAES
 
 global kmers
-kmers = []
-read_length = 100
-num_reads = 1000000
+global orig
+global noisy
+global k
+global n
+global alphabet
+global delta
+global rho
+global max_del
 
 def allklength(k, alphabet):
     allklengthHelper(k, alphabet, "")
@@ -26,9 +31,6 @@ def takeReads(genome):
         index = int(random.random()*(len(genome)-read_length))
         concatenated += genome[index:index+read_length]
     return concatenated
-
-def kEntropy(input, k, alphabet):
-    return 0
 
 def calculateMatrix(input_sequence, k, alphabet):
     matrix_dim = len(alphabet)**k;
@@ -173,8 +175,8 @@ def denoiseSequence1(input_sequence, k, alphabet, deletion_rate):
 def denoiseSequence2(noisy, k, alphabet, deletion_rate, max_del=1, weights=[1]):
     adjust = 1
     if len(weights) != max_del:
-        print('Error: dimension of weights vector is not equal to number of separation lengths.')
-        print('Using default weights.')
+        #print('Error: dimension of weights vector is not equal to number of separation lengths.')
+        #print('Using default weights.')
         weights = [1]*maxdel
     context_hists = []
     for j in range(max_del):
@@ -217,10 +219,14 @@ def optimalDenoise(noisy, k, alphabet, rho, alpha):
     return noisy
         
 
-def denoiseSequence3(noisy, k, alphabet, rho, l=-1):
+def denoiseSequence3(noisy, k, alphabet, rho, l=-1, weights=[1]):
     adjust = 1
     if l == -1:
         l = k
+    if len(weights) != l:
+        #print('Error: dimension of weights vector is not equal to number of votes per context.')
+        #print('Using default weights.')
+        weights = [1]*l
     context_left = {} 
     context_right = {}
     for i in range(len(noisy)):
@@ -247,13 +253,13 @@ def denoiseSequence3(noisy, k, alphabet, rho, l=-1):
                         p1 = sum([int(y == noisy[i-x]) for y in context_right[context1[i-x+1:i-x+k+1]]])
                         p2 = sum([int(y == noisy[i-x]) for y in context_right[context2[i-x+1:i-x+k+1]]])
                         if (1-rho)*p1 <= rho*p2:
-                            vote += 1
+                            vote += weights[x]
                 for x in range(l):
                     if context2[i+x-k:i+x] in context_left:
                         p1 = sum([int(y == noisy[i+x]) for y in context_left[context1[i+x-k:i+x]]]) 
                         p2 = sum([int(y == noisy[i+x]) for y in context_left[context2[i+x-k:i+x]]])
                         if (1-rho)*p1 <= rho*p2:
-                            vote += 1
+                            vote += weights[x]
                 if vote >= l:
                     noisy = noisy[:i+1]+a+noisy[i+1:]
     return noisy
@@ -273,42 +279,21 @@ def textDenoise(filename):
     f.write(noisy)
     f.close()
 
-def weightWrapper(weights):
-    a = 0.9
-    eps = 0.2
-    max_del = 1
-    n = 10000
-    alphabet = ['+', '-']
-    p = random.random()
-    k = int(0.5*math.log(n, 3))
-    x = ''
-    for i in range(n):
-        if i == 0:
-            if p < 0.5:
-                x += '+'
-            else:
-                x += '-'
-        else:
-            if p < a:
-                if x[i-1] == '+':
-                    x += '-'
-                else:
-                    x += '+'
-            else:
-                x += x[i-1]
-            p = random.random()
-    noisy = deletionChannel(x, eps)
-    est1 = denoiseSequence2(noisy, k, alphabet, eps, max_del, weights)
-    est = optimalDenoise(noisy, k, alphabet, eps, a)
-    err = error(est, x)/(n+0.0)-error(est1, x)/(n+0.0)
+def weightWrapper1(weights):
+    est1 = denoiseSequence2(noisy, k, alphabet, rho, max_del, weights)
+    est = optimalDenoise(noisy, k, alphabet, rho, delta)
+    err = error(est1, orig)/(n+0.0)
     return err
     
+def weightWrapper2(weights):
+    est2 = denoiseSequence3(noisy, k, alphabet, rho, max_del, weights)
+    est = optimalDenoise(noisy, k, alphabet, rho, delta)
+    err = error(est2, orig)/(n+0.0)
+    return err
 
-def markovSourceDenoise(a, eps):
-    n = 10000
-    display = 50
-    alphabet = ['+', '-']
+def generateSequence(n, a):
     p = random.random()
+    global k
     k = int(0.5*math.log(n, 3))
     x = ''
     for i in range(n):
@@ -326,25 +311,46 @@ def markovSourceDenoise(a, eps):
             else:
                 x += x[i-1]
             p = random.random()
-    noisy = deletionChannel(x, eps)
-    est1 = denoiseSequence2(noisy, k, alphabet, eps)
-    est2 = denoiseSequence3(noisy, k, alphabet, eps)
-    est = optimalDenoise(noisy, k, alphabet, eps, a)
-    print 'Setting: alpha = ', a, ', epsilon = ', eps 
-    print 'Original: ', x[:display], '(length ', len(x), ' error ', error(x, x)/(n+0.0), ')'
-    print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, x)/(n+0.0), ')'
-    print 'Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, x)/(n+0.0), ' )'
-    print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', error(est1, x)/(n+0.0), ')'
-    print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', error(est2, x)/(n+0.0), ')'
+    return x
+
+def markovSourceDenoise(transition_prob, deletion_rate, weighted=False):
+    global delta
+    delta = transition_prob
+    global rho
+    rho = deletion_rate
+    global max_del
+    max_del = 1
+    global n
+    n = 10000
+    display = 50
+    global alphabet
+    alphabet = ['+', '-']
+    global orig
+    orig = generateSequence(n, delta)
+    global noisy
+    noisy = deletionChannel(orig, rho)
+    est1 = denoiseSequence2(noisy, k, alphabet, rho)
+    est2 = denoiseSequence3(noisy, k, alphabet, rho)
+    est = optimalDenoise(noisy, k, alphabet, rho, delta)
+    print 'Setting: delta = ', delta, ', rho = ', rho 
+    print 'Original: ', orig[:display], '(length ', len(orig), ' error ', error(orig, orig)/(n+0.0), ')'
+    print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, orig)/(n+0.0), ')'
+    print 'Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, orig)/(n+0.0), ' )'
+    print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', error(est1, orig)/(n+0.0), ')'
+    print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', error(est2, orig)/(n+0.0), ')'
+    if weighted:
+        l1 = CMAES(weightWrapper1, [1])
+        l1.minimize = True
+        l1.maxEvaluations = 200
+        weights1 = l1.learn()[0]
+        l2 = CMAES(weightWrapper2, [1]*k)
+        l2.minimize = True
+        l2.maxEvaluations = 200
+        weights2 = l2.learn()[0]
+        weighted_est1 = denoiseSequence2(noisy, k, alphabet, rho, max_del, weights1)
+        weighted_est2 = denoiseSequence3(noisy, k, alphabet, rho, max_del, weights2)
+        print 'Weighted Denoiser 1: ', weighted_est1[:display], '(length ', len(weighted_est1), ' error ', error(weighted_est1, orig)/(n+0.0), ')'
+        print 'Weighted Denoiser 2: ', weighted_est2[:display], '(length ', len(weighted_est2), ' error ', error(weighted_est2, orig)/(n+0.0), ')'
     print '\n'*5
 
-#alphas = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
-#epsilons = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
-#for i in range(len(alphas)):
-#    for j in range(len(epsilons)):
-#        markovSourceDenoise(alphas[i], epsilons[j])
-l = CMAES(weightWrapper, [1])
-l.minimize = True
-l.maxEvaluations = 100
-optval = l.learn()
-print(optval)
+markovSourceDenoise(0.9, 0.2, True)
