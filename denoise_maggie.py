@@ -195,8 +195,8 @@ def denoiseSequence2(noisy, k, alphabet, deletion_rate, max_del=1, weights=[1]):
         allklength(j, alphabet)
         for i in range(k, len(noisy)-k):
             context = noisy[i-k:i+k]
-            context_del_hist = context_hists[j]
-            context_hist = context_hists[0]
+            context_hist = context_hists[j]
+            context_del_hist = context_hists[0]
             if context in context_hist and context in context_del_hist:
                 if adjust*(deletion_rate**j)*len(context_hist[context])*weights[j-1] >= (1.0/adjust)*(1-deletion_rate)*len(context_del_hist[context]):
                     ml = kmers[0]
@@ -226,8 +226,8 @@ def denoiseSequence3(noisy, k, alphabet, rho, l=-1, weights=[1]):
     if l == -1:
         l = k
     if len(weights) != l:
-        #print('Error: dimension of weights vector is not equal to number of votes per context.')
-        #print('Using default weights.')
+        print('Error: dimension of weights vector is not equal to number of votes per context.')
+        print('Using default weights.')
         weights = [1]*l
     context_left = {} 
     context_right = {}
@@ -251,13 +251,13 @@ def denoiseSequence3(noisy, k, alphabet, rho, l=-1, weights=[1]):
             context2 = noisy[i-k+1:i+1]+a+noisy[i+1:i+k+1]
             if a+rcontext[:-1] in context_right and lcontext[1:]+a in context_left:
                 for x in range(l):
-                    if context2[i-x+1:i-x+k] in context_right:
+                    if context1[i-x+1:i-x+k+1] in context_right and context2[i-x+1:i-x+k] in context_right:
                         p1 = sum([int(y == noisy[i-x]) for y in context_right[context1[i-x+1:i-x+k+1]]])
                         p2 = sum([int(y == noisy[i-x]) for y in context_right[context2[i-x+1:i-x+k+1]]])
                         if (1-rho)*p1 <= rho*p2:
                             vote += weights[x]
                 for x in range(l):
-                    if context2[i+x-k:i+x] in context_left:
+                    if context1[i-x+1:i-x+k+1] in context_left and context2[i+x-k:i+x] in context_left:
                         p1 = sum([int(y == noisy[i+x]) for y in context_left[context1[i+x-k:i+x]]]) 
                         p2 = sum([int(y == noisy[i+x]) for y in context_left[context2[i+x-k:i+x]]])
                         if (1-rho)*p1 <= rho*p2:
@@ -323,7 +323,7 @@ def markovSourceDenoise(transition_prob, deletion_rate, weighted=False):
     global max_del
     max_del = 2
     global n
-    n = 10
+    n = 10000
     display = 50
     global alphabet
     alphabet = ['+', '-']
@@ -332,35 +332,39 @@ def markovSourceDenoise(transition_prob, deletion_rate, weighted=False):
     global noisy
     noisy = deletionChannel(orig, rho)
     est1 = denoiseSequence2(noisy, k, alphabet, rho, max_del)
-    est2 = denoiseSequence3(noisy, k, alphabet, rho)
+    #est2 = denoiseSequence3(noisy, k, alphabet, rho)
     est = optimalDenoise(noisy, k, alphabet, rho, delta)
-    print max_del
     print 'Setting: delta = ', delta, ', rho = ', rho 
-    print 'Original: ', orig[:display], '(length ', len(orig), ' error ', error(orig, orig)/(n+0.0), ')'
-    print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, orig)/(n+0.0), ')'
-    print 'Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, orig)/(n+0.0), ' )'
-    print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', error(est1, orig)/(n+0.0), ')'
-    print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', error(est2, orig)/(n+0.0), ')'
+    print 'Original: ', orig[:display], '(length ', len(orig), ' error ', error(orig, orig)/(n+0.0), levenshtein(orig, orig)/(n+0.0), ')'
+    print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, orig)/(n+0.0), levenshtein(noisy, orig)/(n+0.0), ')'
+    print 'Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, orig)/(n+0.0), levenshtein(est, orig)/(n+0.0), ' )'
+    print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', error(est1, orig)/(n+0.0), levenshtein(est1, orig)/(n+0.0), ')'
+    #print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', error(est2, orig)/(n+0.0), ')'
     if weighted:
         l1 = CMAES(weightWrapper1, [1])
         l1.minimize = True
         l1.maxEvaluations = 200
-        weights1 = l1.learn()[0]
-        l2 = CMAES(weightWrapper2, [1]*k)
-        l2.minimize = True
-        l2.maxEvaluations = 200
-        weights2 = l2.learn()[0]
+        opt_vals1 = l1.learn()
+        weights1 = opt_vals1[0]
+        err1 = opt_vals1[1]
+        #l2 = CMAES(weightWrapper2, [1]*k)
+        #l2.minimize = True
+        #l2.maxEvaluations = 200
+        #opt_vals2 = l2.learn()
+        #weights2 = opt_vals2[0]
+        #err2 = opt_vals2[1]
+        print(weights1)
         weighted_est1 = denoiseSequence2(noisy, k, alphabet, rho, max_del, weights1)
-        weighted_est2 = denoiseSequence3(noisy, k, alphabet, rho, k, weights2)
-        print 'Weighted Denoiser 1: ', weighted_est1[:display], '(length ', len(weighted_est1), ' error ', error(weighted_est1, orig)/(n+0.0), ')'
-        print 'Weighted Denoiser 2: ', weighted_est2[:display], '(length ', len(weighted_est2), ' error ', error(weighted_est2, orig)/(n+0.0), ')'
+        #weighted_est2 = denoiseSequence3(noisy, k, alphabet, rho, k, weights2)
+        print 'Weighted Denoiser 1: ', weighted_est1[:display], '(length ', len(weighted_est1), ' error ', err1, ')'
+        #print 'Weighted Denoiser 2: ', weighted_est2[:display], '(length ', len(weighted_est2), ' error ', err2, ')'
     print '\n'*5
 
 def main():
-    alphas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
-    epsilons = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+    alphas = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]
+    epsilons = [0.01, 0.1, 0.2, 0.3, 0.4]
     for a in alphas:
         for e in epsilons:
             markovSourceDenoise(a, e, True)
 
-markovSourceDenoise(0.9, 0.2)
+main()
