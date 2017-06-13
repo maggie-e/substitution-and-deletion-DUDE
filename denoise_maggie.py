@@ -14,6 +14,8 @@ global rho
 global max_del
 
 def allklength(k, alphabet):
+    global kmers
+    kmers = []
     allklengthHelper(k, alphabet, "")
 
 def allklengthHelper(k, alphabet, prefix):
@@ -177,9 +179,9 @@ def denoiseSequence2(noisy, k, alphabet, deletion_rate, max_del=1, weights=[1]):
     if len(weights) != max_del:
         #print('Error: dimension of weights vector is not equal to number of separation lengths.')
         #print('Using default weights.')
-        weights = [1]*maxdel
+        weights = [1]*max_del
     context_hists = []
-    for j in range(max_del):
+    for j in range(max_del+1):
         context_del_hist = {}
         for i in range(k+j, len(noisy)-k):
             context_del = noisy[i-k-j:i-j]+noisy[i:i+k]
@@ -189,7 +191,7 @@ def denoiseSequence2(noisy, k, alphabet, deletion_rate, max_del=1, weights=[1]):
             else:
                 context_del_hist[context_del] = [deleted]
         context_hists.append(context_del_hist)
-    for j in range(1, max_del):
+    for j in range(1, max_del+1):
         allklength(j, alphabet)
         for i in range(k, len(noisy)-k):
             context = noisy[i-k:i+k]
@@ -265,9 +267,9 @@ def denoiseSequence3(noisy, k, alphabet, rho, l=-1, weights=[1]):
     return noisy
 
 def textDenoise(filename):
-    n = 10000
+    n = 100000
     ks = open(filename, 'r').read()[:n]
-    k = int(0.5*math.log(n, 3))
+    k = int(0.2*math.log(n, 2))
     eps = 0.1
     alphabet = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ')
     noisy = deletionChannel(ks, eps)
@@ -319,9 +321,9 @@ def markovSourceDenoise(transition_prob, deletion_rate, weighted=False):
     global rho
     rho = deletion_rate
     global max_del
-    max_del = 1
+    max_del = 2
     global n
-    n = 10000
+    n = 10
     display = 50
     global alphabet
     alphabet = ['+', '-']
@@ -329,9 +331,10 @@ def markovSourceDenoise(transition_prob, deletion_rate, weighted=False):
     orig = generateSequence(n, delta)
     global noisy
     noisy = deletionChannel(orig, rho)
-    est1 = denoiseSequence2(noisy, k, alphabet, rho)
+    est1 = denoiseSequence2(noisy, k, alphabet, rho, max_del)
     est2 = denoiseSequence3(noisy, k, alphabet, rho)
     est = optimalDenoise(noisy, k, alphabet, rho, delta)
+    print max_del
     print 'Setting: delta = ', delta, ', rho = ', rho 
     print 'Original: ', orig[:display], '(length ', len(orig), ' error ', error(orig, orig)/(n+0.0), ')'
     print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, orig)/(n+0.0), ')'
@@ -348,9 +351,16 @@ def markovSourceDenoise(transition_prob, deletion_rate, weighted=False):
         l2.maxEvaluations = 200
         weights2 = l2.learn()[0]
         weighted_est1 = denoiseSequence2(noisy, k, alphabet, rho, max_del, weights1)
-        weighted_est2 = denoiseSequence3(noisy, k, alphabet, rho, max_del, weights2)
+        weighted_est2 = denoiseSequence3(noisy, k, alphabet, rho, k, weights2)
         print 'Weighted Denoiser 1: ', weighted_est1[:display], '(length ', len(weighted_est1), ' error ', error(weighted_est1, orig)/(n+0.0), ')'
         print 'Weighted Denoiser 2: ', weighted_est2[:display], '(length ', len(weighted_est2), ' error ', error(weighted_est2, orig)/(n+0.0), ')'
     print '\n'*5
 
-markovSourceDenoise(0.9, 0.2, True)
+def main():
+    alphas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
+    epsilons = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+    for a in alphas:
+        for e in epsilons:
+            markovSourceDenoise(a, e, True)
+
+markovSourceDenoise(0.9, 0.2)
