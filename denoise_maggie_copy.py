@@ -235,9 +235,9 @@ def denoiseSequence4(noisy, k, alphabet, deletion_rate):
     for i in range(2,len(noisy)):
         tripletcontext = noisy[i-2:i+1]
         if tripletcontext in tripletprobs:
-            tripletprobs[tripletcontext] += 1/(len(noisy)-1.0)
+            tripletprobs[tripletcontext] += 1/(len(noisy)-2.0)
         else:
-            tripletprobs[tripletcontext] = 1/(len(noisy)-1.0)
+            tripletprobs[tripletcontext] = 1/(len(noisy)-2.0)
     
     newsequence = ''
     for i in range(len(noisy)-1):
@@ -253,17 +253,17 @@ def denoiseSequence4(noisy, k, alphabet, deletion_rate):
             if suggestedtriplet in tripletprobs:
                 prob_currtriplet = tripletprobs[suggestedtriplet]
                 alltripletprobs+= prob_currtriplet
-                P1.append((1-deletion_rate)*prob_currtriplet)
+                P1.append(prob_currtriplet)
             else:
                 P1.append(0.0)
-        P1.append((1-deletion_rate)*prob_currpair + deletion_rate*alltripletprobs)
+        P1.append(prob_currpair + deletion_rate*alltripletprobs)
         index, value = max(enumerate(P1), key=operator.itemgetter(1))
         if index != len(alphabet):
             toadd += alphabet[index]
         newsequence += toadd
     newsequence += noisy[-1]
-    
     return newsequence
+
 
 def denoiseSequence3(noisy, k, alphabet, rho, l=-1, weights=[1]):
     adjust = 1
@@ -377,12 +377,12 @@ def markovSourceDenoise(transition_prob, deletion_rate, weighted=False):
     noisy = deletionChannel(orig, rho)
     est1 = denoiseSequence2(noisy, k, alphabet, rho, max_del)
     #est2 = denoiseSequence3(noisy, k, alphabet, rho)
-    est4 = denoiseSequence4(noisy, k, alphabet, rho, max_del)
+    est4 = denoiseSequence4(noisy, k, alphabet, rho)
     est = optimalDenoise(noisy, k, alphabet, rho, delta)
     print 'Setting: delta = ', delta, ', rho = ', rho 
     print 'Original: ', orig[:display], '(length ', len(orig), ' error ', error(orig, orig)/(n+0.0), levenshtein(orig, orig)/(n+0.0), ')'
     print 'Noisy: ', noisy[:display], '(length ', len(noisy), ' error ', error(noisy, orig)/(n+0.0), levenshtein(noisy, orig)/(n+0.0), ')'
-    print 'Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, orig)/(n+0.0), levenshtein(est, orig)/(n+0.0), ' )'
+    print 'Optimal Denoised: ', est[:display], '(length ', len(est), ' error ', error(est, orig)/(n+0.0), levenshtein(est, orig)/(n+0.0), ' )'
     print 'Denoiser 1: ', est1[:display], '(length ', len(est1), ' error ', error(est1, orig)/(n+0.0), levenshtein(est1, orig)/(n+0.0), ')'
     print 'Denoiser 4: ', est4[:display], '(length ', len(est4), ' error ', error(est4, orig)/(n+0.0), levenshtein(est4, orig)/(n+0.0), ')'
     #print 'Denoiser 2: ', est2[:display], '(length ', len(est2), ' error ', error(est2, orig)/(n+0.0), ')'
@@ -407,10 +407,10 @@ def markovSourceDenoise(transition_prob, deletion_rate, weighted=False):
     print '\n'*5
 
 def main():
-    alphas = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]
-    epsilons = [0.01, 0.1, 0.2, 0.3, 0.4]
+    alphas = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]  # Transition probabilities
+    epsilons = [0.2, 0.3, 0.4] # Deletion rates
     for a in alphas:
         for e in epsilons:
-            markovSourceDenoise(a, e, True)
+            markovSourceDenoise(a, e, False)
 
 main()
